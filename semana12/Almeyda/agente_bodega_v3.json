@@ -1,0 +1,270 @@
+{
+  "name": "agente_bodega_v3",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bodega-v3",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8573a54d-8964-41db-a657-f03ed24aa2cd",
+      "name": "Webhook",
+      "webhookId": "d1894766-bc19-4e87-910b-70915ede1349"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ respuesta: $json.output }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        592,
+        0
+      ],
+      "id": "47119113-def4-4dea-9a70-56c744101f6c",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.pregunta }}",
+        "options": {
+          "systemMessage": "Eres el asistente virtual de la bodega Doña Rosa. Tu función es atender amablemente a los clientes, responder consultas y registrar pedidos siguiendo estas reglas:\n\nNo inventes información sobre productos, precios, stock, horarios o servicios. Consulta las herramientas productos y buscar_faq según corresponda.\n\nSi la herramienta buscar_faq devuelve SIN_RESULTADO, informa al cliente que no dispones de esa información y sugiere consultar directamente con Doña Rosa.\n\nAntes de registrar un pedido, verifica que exista stock suficiente mediante la herramienta productos. Solicita la confirmación del cliente antes de utilizar registrar_pedido.\n\nSi el cliente no indica el producto o la cantidad que desea comprar, solicita la información faltante antes de continuar.\n\nUtiliza escalar_a_humano cuando el cliente solicite devoluciones de dinero, anulaciones de pedidos o presente reclamos relacionados con datos personales. No prometas devoluciones ni solicites información personal innecesaria.\n\nResponde siempre en español, de manera clara, amable y breve."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "7d503a37-28bd-4fa6-a084-78f79cb92427",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        224
+      ],
+      "id": "3bb94c59-b223-413f-a7f4-3bab36b248b6",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "IINsq1qSHn58CnS4",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.cliente ?? 'anonimo' }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        144,
+        224
+      ],
+      "id": "5e5e7daf-2d11-4086-bcf0-588751c8c69f",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [
+        288,
+        224
+      ],
+      "id": "a02659c1-745f-434a-be7f-83a822c4478b",
+      "name": "Calculator"
+    },
+    {
+      "parameters": {
+        "description": "Devuelve la lista de productos de la bodega con precio y stock",
+        "jsCode": "return JSON.stringify([\n  {nombre:'Arroz Costeño 5 kg',precio:24.5,stock:12},\n  {nombre:'Aceite Primor 1 L',precio:9.8,stock:0},\n  {nombre:'Leche Gloria',precio:4.2,stock:30}\n]);"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        224
+      ],
+      "id": "6dedfda2-530c-451f-a3b5-e0fe9c9757c5",
+      "name": "productos"
+    },
+    {
+      "parameters": {
+        "description": "Busca información en las preguntas frecuentes de la bodega Doña Rosa sobre horarios de atención, delivery, métodos de pago y otros servicios. Utiliza esta herramienta cuando el cliente solicite información sobre la bodega. Recibe una palabra clave en minúsculas y sin tildes, por ejemplo: horario, delivery o pago. Devuelve las respuestas relacionadas con la palabra clave consultada. Si no encuentra información, devuelve SIN_RESULTADO.",
+        "jsCode": "const faqs = [\n  {\n    tema: 'horario',\n    r: 'La bodega atiende de lunes a sábado de 7:00 a. m. a 9:00 p. m.'\n  },\n  {\n    tema: 'ubicacion',\n    r: 'La bodega Doña Rosa se encuentra en San Vicente de Cañete.'\n  },\n  {\n    tema: 'productos',\n    r: 'Ofrecemos arroz, leche, aceite, azúcar, fideos, bebidas y otros productos de primera necesidad.'\n  },\n  {\n    tema: 'yape',\n    r: 'Sí, aceptamos pagos mediante Yape y efectivo.'\n  },\n  {\n    tema: 'delivery',\n    r: 'Sí, ofrecemos entregas a domicilio dentro de nuestra zona de cobertura, previa coordinación.'\n  },\n  {\n    tema: 'pago',\n    r: 'Aceptamos pagos en efectivo y mediante Yape.'\n  },\n  {\n    tema: 'oferta',\n    r: 'Sí, contamos con ofertas en determinados productos, dependiendo de las promociones disponibles.'\n  },\n  {\n    tema: 'telefono',\n    r: 'Sí, puedes comunicarte con la bodega para consultar productos y coordinar tu pedido.'\n  },\n  {\n    tema: 'danado',\n    r: 'Puedes comunicarte con la bodega para revisar el inconveniente y coordinar una posible devolución o cambio.'\n  },\n  {\n    tema: 'mayor',\n    r: 'Sí, atendemos consultas de compras al por mayor, sujetas a la disponibilidad de productos.'\n  },\n  {\n    tema: 'vendidos',\n    r: 'Entre los productos de mayor demanda se encuentran el arroz, la leche, el azúcar, el aceite y los fideos.'\n  },\n  {\n    tema: 'bebidas',\n    r: 'Sí, ofrecemos bebidas como gaseosas, agua y jugos, según la disponibilidad.'\n  },\n  {\n    tema: 'precio',\n    r: 'Sí, puedes consultar los precios de los productos antes de realizar tu compra.'\n  },\n  {\n    tema: 'agotado',\n    r: 'Si un producto está agotado, te informaremos sobre su disponibilidad y podremos sugerirte otras alternativas.'\n  },\n  {\n    tema: 'reserva',\n    r: 'Puedes consultar con la bodega la posibilidad de reservar productos y coordinar su recojo.'\n  },\n  {\n    tema: 'limpieza',\n    r: 'Sí, ofrecemos productos de limpieza como detergente, lejía, jabón y lavavajillas, según la disponibilidad.'\n  },\n  {\n    tema: 'unidad',\n    r: 'Sí, puedes comprar productos por unidad, siempre que estén disponibles para la venta individual.'\n  },\n  {\n    tema: 'variacion',\n    r: 'Sí, los precios pueden variar dependiendo del proveedor, los costos de adquisición y las promociones vigentes.'\n  },\n  {\n    tema: 'estado',\n    r: 'Puedes comunicarte con la bodega para consultar el estado de tu pedido y coordinar su entrega o recojo.'\n  },\n  {\n    tema: 'descuento',\n    r: 'Puedes consultar con la bodega si existen descuentos especiales para compras en grandes cantidades.'\n  }\n];\n\nconst q = String(query).toLowerCase();\nconst hits = faqs.filter(f => q.includes(f.tema));\n\nreturn hits.length ? JSON.stringify(hits) : 'SIN_RESULTADO';"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        544,
+        224
+      ],
+      "id": "0d6e1934-158c-42a9-ad45-650ca40d36f9",
+      "name": "buscar_faq"
+    },
+    {
+      "parameters": {
+        "description": "Registra pedidos de los clientes de la bodega Doña Rosa. Recibe el nombre del producto y la cantidad solicitada. Utiliza esta herramienta únicamente después de verificar que existe stock suficiente mediante la herramienta productos y de que el cliente confirme su pedido. Si no hay stock suficiente o el cliente todavía no ha confirmado, no registres el pedido. Devuelve un número de pedido registrado junto con los datos de la compra.",
+        "jsCode": "const numero = Date.now().toString().slice(-5);\n\nreturn 'PEDIDO_REGISTRADO N.° ' + numero + ' | ' + query;"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        224
+      ],
+      "id": "1bcf1a49-73c0-436a-8fc1-a126bafc9530",
+      "name": "registrar_pedido"
+    },
+    {
+      "parameters": {
+        "description": "Deriva a Doña Rosa los casos que requieren atención humana, como solicitudes de devolución de dinero, anulación de pedidos, reclamos o situaciones relacionadas con datos personales. Recibe como entrada un resumen breve del motivo de la solicitud del cliente en una sola línea. Utiliza esta herramienta cuando el agente no pueda resolver el caso por sí mismo. Devuelve una confirmación de que el caso ha sido escalado para atención humana.",
+        "jsCode": "return 'ESCALADO: Doña Rosa atendera el caso. Motivo: ' + query;"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        816,
+        224
+      ],
+      "id": "7bbc36aa-c783-441a-8c28-c245277200d2",
+      "name": "escalar_a_humano"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "productos": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_faq": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrar_pedido": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "escalar_a_humano": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "de6bce97-846e-48eb-8cb3-9dac3d8df131",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "03b744fffbc233def393a7459ff5c07906056f0020704d9c58ecd080258bb107"
+  },
+  "nodeGroups": [],
+  "id": "1JzpWLAh8liMmOha",
+  "tags": []
+}
